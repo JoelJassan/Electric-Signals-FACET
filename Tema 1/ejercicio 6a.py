@@ -12,6 +12,7 @@ import numpy as np
 
 #parametros generales
 n = 100000
+bins = 100
 
 #generacion de muestras
 uniforme = np.random.rand(n)
@@ -25,13 +26,13 @@ normal_mod = mu + sigma*normal
 #visualización de graficas
 fig, ax = plt.subplots(1, 2)
 
-ax[0].hist(uniforme, bins=100, density=True, edgecolor='black', linewidth=.5)
+ax[0].hist(uniforme, bins, density=True, edgecolor='black', linewidth=.5)
 ax[0].set_xlabel("Rango de valores")
 ax[0].set_ylabel("Densidad de probabilidad uniforme")
 #ax[1].set_title("Histograma")
 
-ax[1].hist(normal, bins=100, density=True, edgecolor='black', linewidth=.5)
-ax[1].hist(normal, bins=100, density=True, edgecolor='black', linewidth=.5)
+ax[1].hist(normal, bins, density=True, edgecolor='black', linewidth=.5)
+ax[1].hist(normal_mod, bins, density=True, edgecolor='black', linewidth=.5)
 ax[1].set_xlabel("Rango de valores")
 ax[1].set_ylabel("Densidad de probabilidad normal")
 
