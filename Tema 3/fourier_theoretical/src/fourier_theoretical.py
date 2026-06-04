@@ -174,7 +174,7 @@ class FourierTheoretical:
         
         magnitudes_full = self.get_magnitude_spectrum()
         magnitudes = magnitudes_full[1:]
-        print("\nEspectro de magnitud (√(an² + bn²)):")
+        print("\nEspectro de magnitud (sqrt(an^2 + bn^2)):")
         for n, mag in enumerate(magnitudes, 1):
             print(f"  C{n} = {mag:.6f}")
     
