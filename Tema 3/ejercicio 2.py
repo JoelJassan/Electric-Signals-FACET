@@ -9,20 +9,26 @@ calculado numéricamente para cada uno de los dos casos.
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Importar clases de módulos locales
+from fft_analyzer import FFTAnalyzer
+from fourier_theoretical import FourierTheoretical
+
+
+# ===== Generación de Señales Cuadradas ===== #
+
 # Parámetros de la señal
-ciclos = 3
-T = 1  # Período
-D = 0.3  # Ciclo activo del 50%
+f = 10
+T = 1/f  # Período
+D = 0.9  # Ciclo activo del 50%
 N1 = 100  # Número de muestras por período (caso 1)
 N2 = 1000  # Número de muestras por período (caso 2)
 
-# Muestreo
-f_sampling_1 = N1
-f_sampling_2 = N2
+# Muestreo - Usar solo 1 período para comparación correcta con coeficientes teóricos
+f_sampling_1 = N1/T
+f_sampling_2 = N2/T
 
-sampling_time_1 = np.arange(0, ciclos*T, 1/f_sampling_1)
-sampling_time_2 = np.arange(0, ciclos*T, 1/f_sampling_2)
-
+sampling_time_1 = np.arange(0, T, 1/f_sampling_1)
+sampling_time_2 = np.arange(0, T, 1/f_sampling_2)
 
 
 # Generación de señales discretas (onda cuadrada)
@@ -30,7 +36,7 @@ square_wave_1 = []
 for t in sampling_time_1:
     tau = (t + T/2) % T - T/2 
 
-    if abs(tau) <= D*T/2: #centrado en la mitad del pulso activo
+    if abs(tau) <= D*T/2:  # centrado en la mitad del pulso activo
         square_wave_1.append(1)
     else:
         square_wave_1.append(0)
@@ -47,25 +53,122 @@ for t in sampling_time_2:
 square_wave_2 = np.array(square_wave_2)
 
 
+# ===== Análisis FFT con POO ===== #
 
-# ----- Fourier ------------------------- #
-from dataclasses import dataclass, field
-import math
+# Cantidad de armónicos a calcular
+num_harmonics = 6
 
-@dataclass
-class FourierCoefficients:
-    a0: float = 0.0
-    an: list = field(default_factory=list)
-    bn: list = field(default_factory=list)
+# Crear analizadores para cada caso
+analyzer_1 = FFTAnalyzer(square_wave_1, f_sampling_1, num_harmonics)
+analyzer_2 = FFTAnalyzer(square_wave_2, f_sampling_2, num_harmonics)
 
+# Calcular FFT y extraer armónicos
+analyzer_1.calculate_fft()
+analyzer_1.extract_harmonics()
 
+analyzer_2.calculate_fft()
+analyzer_2.extract_harmonics()
 
+# ===== Análisis Teórico de Fourier ===== #
 
-#visualización de señales
-plt.plot(sampling_time_1, square_wave_1, label='N=100')
-plt.plot(sampling_time_2, square_wave_2, label='N=1000')
-plt.xlabel("Tiempo [s]")
-plt.ylabel("Amplitud [V]")
-plt.legend()
-#plt.grid()
+# Definir la función de la onda cuadrada para cálculo teórico
+def square_wave_func(t):
+    """Función de onda cuadrada para integración analítica"""
+    tau = (t + T/2) % T - T/2
+    return 1.0 if abs(tau) <= D*T/2 else 0.0
+
+# Crear analizadores teóricos
+theoretical = FourierTheoretical(
+    signal_func=square_wave_func,
+    period=T,
+    amplitude=1.0,
+    duty_cycle=D,
+    num_harmonics=num_harmonics
+)
+
+# Calcular coeficientes teóricos
+theoretical.calculate_all_coefficients()
+
+# ===== Mostrar Resultados FFT ===== #
+print("=" * 60)
+print(f"CASO 1: {N1} muestras por período")
+print("=" * 60)
+print(f"\nArmónicos calculados (primeros {num_harmonics}):")
+for info in analyzer_1.get_harmonic_info():
+    print(f"  Armónico {info['numero']}: Frecuencia = {info['frecuencia']:.2f} Hz, Magnitud = {info['magnitud']:.6f}")
+
+print(f"\nLista de magnitudes de armónicos: {analyzer_1.get_harmonics()}")
+
+print("\n" + "=" * 60)
+print(f"CASO 2: {N2} muestras por período")
+print("=" * 60)
+print(f"\nArmónicos calculados (primeros {num_harmonics}):")
+for info in analyzer_2.get_harmonic_info():
+    print(f"  Armónico {info['numero']}: Frecuencia = {info['frecuencia']:.2f} Hz, Magnitud = {info['magnitud']:.6f}")
+
+print(f"\nLista de magnitudes de armónicos: {analyzer_2.get_harmonics()}")
+
+# ===== Mostrar Coeficientes Teóricos de Fourier ===== #
+
+print("\n" + "=" * 60)
+print("COEFICIENTES TEÓRICOS DE FOURIER")
+print("=" * 60)
+theoretical.print_coefficients()
+
+# Obtener espectros para comparación
+freq_1, mag_1 = analyzer_1.frequencies, analyzer_1.magnitudes
+freq_2, mag_2 = analyzer_2.frequencies, analyzer_2.magnitudes
+freq_theo, mag_theo = theoretical.frequencies, theoretical.get_magnitude_spectrum()
+
+# Calcular envolvente teórica continua: sin(n*π*D)/(n*π)
+omega_0 = 2 * np.pi / T
+f_0 = 1.0 / T  # Frecuencia fundamental (1 Hz para T=1)
+n_continuous = np.linspace(0.1, num_harmonics + 2, 200)
+f_continuous = n_continuous * f_0
+envelope_theo = np.abs(np.sin(n_continuous * np.pi * D) / (n_continuous * np.pi))
+
+# Crear figura con 2x2 subplots
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+# Subplot 1 (arriba izq): Señales en el tiempo
+axes[0, 0].plot(sampling_time_1, square_wave_1, label='N=100', marker='o', markersize=3, alpha=0.7)
+axes[0, 0].plot(sampling_time_2, square_wave_2, label='N=1000', marker='.', markersize=2, alpha=0.7)
+axes[0, 0].set_xlabel("Tiempo [s]")
+axes[0, 0].set_ylabel("Amplitud [V]")
+axes[0, 0].set_title("Señales Cuadradas Discretas (1 período)")
+axes[0, 0].legend()
+axes[0, 0].grid(True, alpha=0.3)
+
+# Subplot 2 (arriba der): Espectro Teórico con Envolvente
+axes[0, 1].stem(freq_theo, mag_theo, basefmt=' ', linefmt='g-', markerfmt='go', label='Armónicos')
+axes[0, 1].plot(f_continuous, envelope_theo, 'r--', linewidth=2, label='Envolvente: sin(nπD)/(nπ)')
+axes[0, 1].set_xlabel("Frecuencia [Hz]")
+axes[0, 1].set_ylabel("Magnitud")
+axes[0, 1].set_title(f"Espectro Teórico ({num_harmonics} armónicos)")
+axes[0, 1].legend()
+axes[0, 1].grid(True, alpha=0.3)
+axes[0, 1].set_xlim(left=0)
+
+# Subplot 3 (abajo izq): FFT N=100 vs Envolvente Teórica
+axes[1, 0].stem(freq_1, mag_1, basefmt=' ', linefmt='b-', markerfmt='bs', label='FFT N=100')
+axes[1, 0].plot(f_continuous, envelope_theo, 'r--', linewidth=2, label='Envolvente teórica')
+axes[1, 0].set_xlabel("Frecuencia [Hz]")
+axes[1, 0].set_ylabel("Magnitud")
+axes[1, 0].set_title(f"Comparación: FFT N={N1} vs Envolvente Teórica")
+axes[1, 0].legend()
+axes[1, 0].grid(True, alpha=0.3)
+axes[1, 0].set_xlim(left=0)
+
+# Subplot 4 (abajo der): FFT N=1000 vs Envolvente Teórica
+axes[1, 1].stem(freq_2, mag_2, basefmt=' ', linefmt='b-', markerfmt='bs', label='FFT N=1000')
+axes[1, 1].plot(f_continuous, envelope_theo, 'r--', linewidth=2, label='Envolvente teórica')
+axes[1, 1].set_xlabel("Frecuencia [Hz]")
+axes[1, 1].set_ylabel("Magnitud")
+axes[1, 1].set_title(f"Comparación: FFT N={N2} vs Envolvente Teórica")
+axes[1, 1].legend()
+axes[1, 1].grid(True, alpha=0.3)
+axes[1, 1].set_xlim(left=0)
+
+plt.tight_layout()
 plt.show()
+print("\nGráficos mostrados exitosamente.")
